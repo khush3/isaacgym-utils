@@ -31,7 +31,8 @@ class RandomDeltaJointPolicy(Policy):
         self._name = name
 
     def __call__(self, scene, env_idx, _, __):
-        delta_joints = (np.random.random(self._franka.n_dofs) * 2 - 1) * ([0.05] * 7 + [0.005] * 2)
+        delta_joints = (np.random.random(16) * 2 - 1) * ([0.05] * 14 + [0.005] * 2)
+        # delta_joints = (np.random.random(self._franka.n_dofs) * 2 - 1) * ([0.05] * 7 + [0.005] * 2)
         self._franka.apply_delta_joint_targets(env_idx, self._name, delta_joints)
 
 

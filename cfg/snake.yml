@@ -9,49 +9,49 @@ scene:
     dt: 0.01
     substeps: 2
     up_axis: z
-    flex:
-      solver_type: 5
-      num_outer_iterations: 4
-      num_inner_iterations: 30
-      relaxation: 0.75
-      warm_start: 0.8
-      shape_collision_margin: 1e-3
-      contact_regularization: 1e-7
-      deterministic_mode: True
-    device:
-      compute: 0
-      graphics: 0
+    type: physx
+    physx:
+      num_threads: 0
+      solver_type: 0 # 0: pgs, 1: tgs
+      num_position_iterations: 10
+      num_velocity_iterations: 6
+      contact_offset: 0.001 # m
+      rest_offset: 0.001 # m
+      bounce_threshold_velocity: 0.2 # m/s
+      max_depenetration_velocity: 5.0 # m/s
+      use_gpu: True # Use GPU for physics computation
+      always_use_articulations: False #
 
 snake:
   attractor_props:
     stiffness: 1e3
     damping: 2.5e2
   asset_options:
-    fix_base_link: True
+    fix_base_link: False
     flip_visual_attachments: False
     armature: 0.01
     max_linear_velocity: 100.0
     max_angular_velocity: 40.0
-    disable_gravity: True
+    disable_gravity: False
   attractor_props:
     stiffness: 1e3
     damping: 2e2
   shape_props:
     thickness: 1e-3
   dof_props:
-    stiffness: [2e3, 2e3, 2e3, 2e3, 2e3, 2e3, 2e3, 1e2, 1e2, 2e3, 2e3, 2e3, 2e3, 1e2, 1e2, 1e2]
-    damping: [2e2, 2e2, 2e2, 2e2, 2e2, 2e2, 2e2, 5, 5, 2e2, 2e2, 2e2, 2e2, 5, 5, 1e2]
-    effort: [87, 87, 87, 87, 12, 12, 12, 100, 100, 87, 12, 12, 12, 100, 100, 1e2]
+    stiffness: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+    damping: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    effort: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]
 
 table:
   dims:
-    sx: 1
-    sy: 1
-    sz: 0.5
+    sx: 10
+    sy: 10
+    sz: 0.1
   shape_props:
     friction: 0.1
-    rolling_friction: 0
-    torsion_friction: 0
+    rolling_friction: 0.1
+    torsion_friction: 0.1
     thickness: 2e-3
   asset_options:
     fix_base_link: True

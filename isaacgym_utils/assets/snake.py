@@ -11,8 +11,7 @@ from .franka_numerical_utils import get_franka_mass_matrix
 
 class GymSnake(GymURDFAsset):
 
-    # INIT_JOINTS = np.array([0, -np.pi / 4, 0, -3 * np.pi / 4, 0, np.pi / 2, np.pi / 4, 0.04, 0.04])
-    INIT_JOINTS = np.array([0, 0, np.pi/2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    INIT_JOINTS = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     _LOWER_LIMITS = None
     _UPPER_LIMITS = None
     _VEL_LIMITS = None

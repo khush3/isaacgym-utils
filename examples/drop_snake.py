@@ -9,7 +9,7 @@ sys.path.append('./isaacgym_utils')
 from isaacgym import gymapi
 from isaacgym_utils.scene import GymScene
 from isaacgym_utils.assets import GymSnake, GymBoxAsset
-from isaacgym_utils.policy import RandomDeltaJointPolicy
+from isaacgym_utils.policy_generic import SnakeGait
 from isaacgym_utils.draw import draw_transforms
 
 
@@ -38,5 +38,5 @@ if __name__ == "__main__":
     def custom_draws(scene):
         draw_transforms(scene, scene.env_idxs, [snake_transform], length=0.2)
 
-    policy = RandomDeltaJointPolicy(snake, 'snake')
+    policy = SnakeGait(snake, 'snake', 'sea-snake', 'rolling')
     scene.run(policy=policy, custom_draws=custom_draws)

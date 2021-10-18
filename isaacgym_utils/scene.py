@@ -14,7 +14,7 @@ class GymScene:
         self._n_envs = cfg['n_envs']
         self._gui = cfg['gui']
         self._dt = cfg['gym']['dt']
-        self._cts = cfg.get('cts', True)
+        self._cts = cfg.get('cts', False) # https://github.com/iamlab-cmu/isaacgym-utils/issues/7
 
         # gui
         if self._gui:
@@ -372,6 +372,8 @@ def make_gym(sim_cfg):
                 raise ValueError('Unknown up_axis! Must be y or z')
         else:
             setattr(sim_params, key, val)
+
+    print(sim_params)
 
     sim = gym.create_sim(compute_device, graphics_device, physics_engine, sim_params)
     gym.add_ground(sim, plane_params)

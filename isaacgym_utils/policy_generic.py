@@ -29,19 +29,21 @@ SNAKES = {
 
 class SnakeGait(Policy):
 
-    def __init__(self, robot, name, snake, gait, *args, **kwargs):
+    def __init__(self, snake, gait, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._robot = robot
-        self._name = name
-        self._snake = snake
+        # self._robot = robot
+        # self._name = name
+        # self._snake = snake
         self._modules = SNAKES[snake]
         self.controller = sg.Gait(numModules=self._modules)
         self.controller.setGait(gait)
 
-    def __call__(self, scene, env_idx, _, t_sim):
+    def __call__(self, observation):
+        t_sim = observation
         gaitSignal = self.controller.getSignal(t_sim)
+        return np.array(gaitSignal)
         # print(gaitSignal)
-        self._robot.set_joints_targets(env_idx, self._name, np.array(gaitSignal))
+        # self._robot.set_joints_targets(env_idx, self._name, np.array(gaitSignal))
 
 class RandomDeltaJointPolicy(Policy):
 

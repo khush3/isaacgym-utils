@@ -4,6 +4,7 @@ from isaacgym_utils.scene import GymScene
 from isaacgym_utils.assets import GymSnake, GymBoxAsset
 from isaacgym_utils.draw import draw_transforms
 
+
 class SnakeEnv():
     def __init__(self, cfg):
         self.n_envs = cfg['scene']['n_envs']
@@ -33,8 +34,11 @@ class SnakeEnv():
     def reset(self):
         self.t_step = 0
         self.t_sim = self.t_step * self.dt
-        observations = [self.t_sim for _ in range(self.n_envs)]
-        return observations
+        time_steps = [self.t_sim for _ in range(self.n_envs)]
+        observations = [np.concatenate([self.get_dof_pose(i), self.get_dof_vel(i), self.get_base_info(i)]) for i in self.env_idxs]
+        self.observations_prev = observations
+        self.base_prev = [self.snake.get_rb_poses_as_np_array(i, 'snake')[1] for i in self.env_idxs]
+        return observations, time_steps
 
 
     def step(self, actions):
@@ -48,19 +52,32 @@ class SnakeEnv():
 
         self.scene.step()
         self.scene.render(custom_draws=self.custom_draws)
-        observation, reward, dones = self.get_ord()
+        observation, reward, dones, time_steps = self.get_ord()
 
         self.t_step += 1
 
-        return observation, reward, dones, None
+        return observation, reward, dones, None, time_steps
 
 
     def get_ord(self):
-        observations = [self.t_sim for _ in range(self.cfg['scene']['n_envs'])]
-        rewards, dones = None, None
-        dofs = np.array([self.snake.get_dof_states(i, 'snake') for i in self.env_idxs])
-        return observations, rewards, dones
+        time_steps = [self.t_sim for _ in range(self.cfg['scene']['n_envs'])]
+        observations = [np.concatenate([self.get_dof_pose(i), self.get_dof_vel(i), self.get_base_info(i)]) for i in self.env_idxs]
+        rewards = [self.get_base_info(i) for i in self.env_idxs]#[p[0] - p_[0] for p, p_ in zip(base_curr, self.base_prev)]
+        dones = np.zeros(len(self.env_idxs))
+        # observations = np.array([[self.snake.get_dof_states(i, 'snake')['pos'], self.snake.get_dof_states(i, 'snake')['vel']] for i in self.env_idxs])
+        # rewards = [p[0] - p_[0] for p, p_ in zip(base_curr, self.base_prev)]
+        # self.base_prev = base_curr
+        # rewards = [(obs[:][0] - obs_prev[:][0]).mean() for obs, obs_prev in zip(observations, self.observations_prev)]
+        return observations, rewards, dones, time_steps
 
+    def get_base_info(self, i):
+        return self.snake.get_rb_poses_as_np_array(i, 'snake')[1]
+
+    def get_dof_pose(self, i):
+        return self.snake.get_dof_states(i, 'snake')['pos']
+
+    def get_dof_vel(self, i):
+        return self.snake.get_dof_states(i, 'snake')['vel']
 
     def custom_draws(self, scene):
         draw_transforms(scene, scene.env_idxs, [self.snake_transform], length=0.2)

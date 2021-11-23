@@ -6,6 +6,8 @@ scene:
     cam_pos: [1.2, 0, 1.2]
     look_at: [0.5, 0, 1]
   gym:
+    n_episodes: 500
+    episode_len: 500
     dt: 0.01
     substeps: 2
     up_axis: z
@@ -19,7 +21,7 @@ scene:
       rest_offset: 0.001 # m
       bounce_threshold_velocity: 0.2 # m/s
       max_depenetration_velocity: 5.0 # m/s
-      use_gpu: True # Use GPU for physics computation
+      use_gpu: False # Use GPU for physics computation
       always_use_articulations: False #
 
 snake:

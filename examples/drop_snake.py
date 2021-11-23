@@ -17,11 +17,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
     cfg = YamlConfig(args.cfg)
 
-    policy = SnakeGait('sea-snake', 'sidewinding')
+    policy = SnakeRandomExploration('sea-snake', 'sidewinding')
     envs = SnakeEnv(cfg)
 
-    observations = envs.reset()
-
-    for _ in range(5000):
-        actions = [policy(i) for i in observations]
-        observations, rewards, dones, _ = envs.step(actions)
+    for ep in range(cfg['scene']['gym']['n_episodes']):
+        policy.new_episode()
+        observations, time_steps = envs.reset()
+        ret = 0
+        for _ in range(cfg['scene']['gym']['episode_len']):
+            actions = [policy(i) for i in time_steps]
+            observations, rewards, dones, _, time_steps = envs.step(actions)
+            ret += rewards[0]
+        policy.update(ret)    
+        print(f'Episode {ep}, Return: {ret}')

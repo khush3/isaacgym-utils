@@ -27,7 +27,67 @@ SNAKES = {
     'ReU': 16
 }
 
-class SnakeGait(Policy):
+class SnakeRandomExploration(Policy):
+
+    def __init__(self, snake, gait, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        init = 'best_action'
+        self.learning_rate = 0.02
+        self.best_directions = 1
+        if init=='random': 
+            print("Training from random policy")
+            self.theta = np.random.rand(6)
+        elif init=='best_action':
+            self.theta = np.array([0, 0.7, 0, 0, .5, 4, 0]) # Linear progression
+        elif init=='zero':
+            print("Training from zero matrix policy")
+        self.numModules=16
+        self.best_return = 0
+        self._modules = SNAKES[snake]
+
+    def new_episode(self):
+        self.perturbations = 0 * np.random.rand(7) / 3.0
+        self.new_theta = self.theta + self.perturbations
+
+    def __call__(self, observation):
+        t_sim = observation
+        gaitSignal = self.controller(t_sim)
+        return np.array(gaitSignal)
+
+    def update(self, ret):
+        if ret > self.best_return:
+            self.theta = self.new_theta
+            self.best_return = ret
+        # step = np.zeros(self.theta.shape)
+        # for r_pos, r_neg, direction in rollouts:
+        #     step += (r_pos - r_neg) * direction
+        # self.theta += self.learning_rate / (self.nb_best_directions * sigma_r) * step
+        # timestr = time.strftime("%Y%m%d-%H%M%S")
+
+    def controller(self,t):
+        A_odd, A_even, beta_odd, beta_even, Ws, Wt, delta = self.new_theta
+        angles = np.zeros([1, self.numModules])
+        for n in range(self.numModules):
+            if n%2 == 1:
+                angles[0, n] = beta_odd+A_odd*np.sin(Ws*n-Wt*t+delta)
+            else:
+                angles[0, n] = beta_even+A_even*np.sin(Ws*n-Wt*t)
+        
+        signal = self.angleReversals(angles)
+        return signal
+
+    def angleReversals(self, angles):
+        reversals = np.array([1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1])
+        angles = np.fliplr(angles)
+        angles = np.multiply(reversals, angles)
+        signal = []
+        for i in range(self.numModules):
+            signal.append(angles[0,i])
+        
+        return signal
+
+
+class Policy(Policy):
 
     def __init__(self, snake, gait, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -44,6 +104,30 @@ class SnakeGait(Policy):
         return np.array(gaitSignal)
         # print(gaitSignal)
         # self._robot.set_joints_targets(env_idx, self._name, np.array(gaitSignal))
+
+    # def get_controls(self, parameters):
+    #     A_odd = 0.75
+    #     A_even = 0
+    #     beta_odd = 0
+    #     beta_even = 0.25  # for stability
+    #     s = 4
+    #     w = 2
+
+    #     angles = np.zeros([1, self.numModules])
+    #     for n in range(self.numModules):
+    #         if n%2 == 1:
+    #             angles[0, n] = beta_odd+A_odd*np.sin(n*s+w*t)
+    #         else:
+    #             angles[0, n] = beta_even+A_even*np.sin(n*s+w*t)
+    #     # reversals = np.array([1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1])
+    #     # angles = np.fliplr(angles)
+    #     # angles = np.multiply(reversals, angles)
+    #     signal = []
+    #     for i in range(self.numModules):
+    #         signal.append(angles[0,i])
+        
+    #     return signal
+
 
 class RandomDeltaJointPolicy(Policy):
 

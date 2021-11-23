@@ -11,10 +11,11 @@ from .franka_numerical_utils import get_franka_mass_matrix
 
 class GymSnake(GymURDFAsset):
 
-    INIT_JOINTS = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    _num_modules = 16
     _LOWER_LIMITS = None
     _UPPER_LIMITS = None
     _VEL_LIMITS = None
+    INIT_JOINTS = np.array([0] * _num_modules)
 
     _URDF_PATH = 'snake_description/robots/snake_dynamics.urdf'
     _URDF_PATH_WITH_DYNAMICS = 'snake_description/robots/snake_dynamics.urdf'
@@ -58,6 +59,13 @@ class GymSnake(GymURDFAsset):
 
         self._attractor_stiffness = cfg['attractor_props']['stiffness']
         self._attractor_damping = cfg['attractor_props']['damping']
+
+    def reset(self, i, name, rb_transforms):
+        self.set_rb_transforms(i, name, rb_transforms)
+        self.set_joints(i, name, self.INIT_JOINTS)
+        self.set_joints_targets(i, name, self.INIT_JOINTS)
+        self.set_joints_velocity(i, name, self.INIT_JOINTS)
+        self.set_dof_states(i, name, list(self.INIT_JOINTS))
 
     def set_gripper_width_target(self, env_idx, name, width):
         joints_targets = self.get_joints_targets(env_idx, name)
@@ -290,3 +298,15 @@ class GymSnake(GymURDFAsset):
 
     def reset_joints(self, env_idx, name):
         self.set_joints(env_idx, name, self.INIT_JOINTS)
+
+    def controller(self, params, t):
+        A_odd, A_even, beta_odd, beta_even, Ws, Wt, delta = params
+        angles = []
+        reversals = np.array([1, 1, -1, -1] * int(self._num_modules/4))
+        for n in range(self._num_modules):
+            if n%2 == 1:
+                angles.append(beta_odd + A_odd * np.sin(Ws*n - Wt*t + delta))
+            else:
+                angles.append(beta_even + A_even * np.sin(Ws*n - Wt*t))
+        signal = np.array(angles)[::-1] * reversals
+        return np.array(signal)

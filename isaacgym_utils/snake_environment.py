@@ -30,52 +30,38 @@ class SnakeEnv():
     
         self.scene.setup_all_envs(self.setup)
 
-        self.info_store = self.snake.get_rb_transforms(0, self._name)
+        self.init_rb_transform = self.snake.get_rb_transforms(0, self._name)
 
 
     def reset(self):
-        INIT_JOINTS = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-
-        for i in self.env_idxs: 
-            self.snake.set_rb_transforms(i, self._name, self.info_store)
-            self.snake.set_joints(i, self._name, INIT_JOINTS)
-            self.snake.set_joints_targets(i, self._name, INIT_JOINTS)
-            self.snake.set_joints_velocity(i, self._name, INIT_JOINTS)
-            self.snake.set_dof_states(i, self._name, [0] * len(self.snake.get_dof_states(i, self._name)))
-
-        self.t_step = 0
-        self.t_sim = self.t_step * self.dt
-        time_steps = [self.t_sim for _ in range(self.n_envs)]
-        observations = [np.concatenate([self.get_dof_pose(i), self.get_dof_vel(i), self.get_base_info(i)]) for i in self.env_idxs]
-        self.observations_prev = observations
-        self.base_prev = [self.snake.get_rb_poses_as_np_array(i, 'snake')[1] for i in self.env_idxs]
-        return observations, time_steps
-
+        self.t_sim = 0
+        for i in self.env_idxs: self.snake.reset(i, self._name, self.init_rb_transform)
+        observations = self.get_observation()
+        return observations
 
     def step(self, actions):
-        self.t_sim = self.t_step * self.dt
-
-        if self.time_horizon is not None and self.t_step >= self.time_horizon:
-            print("Reached time horizon. Reseting!")
+        self.t_sim += self.dt
 
         for env_idx in self.env_idxs:
-            self.snake.set_joints_targets(env_idx, self._name, actions[env_idx])
+            target_angles = self.snake.controller(actions[env_idx], self.t_sim)
+            self.snake.set_joints_targets(env_idx, self._name, target_angles)
 
         self.scene.step()
         self.scene.render(custom_draws=self.custom_draws)
-        observation, reward, dones, time_steps = self.get_ord()
+        observations = self.get_observation()
+        rewards = self.get_reward()
+        dones = self.termination()
 
-        self.t_step += 1
+        return observations, rewards, dones, None
 
-        return observation, reward, dones, None, time_steps
+    def get_observation(self):
+        return [np.concatenate([self.get_dof_pose(i), self.get_dof_vel(i), self.get_base_info(i)]) for i in self.env_idxs]
 
+    def get_reward(self):
+        return [self.get_base_info(i)[1] for i in self.env_idxs] # Incentivize side movement 
 
-    def get_ord(self):
-        time_steps = [self.t_sim for _ in range(self.cfg['scene']['n_envs'])]
-        observations = [np.concatenate([self.get_dof_pose(i), self.get_dof_vel(i), self.get_base_info(i)]) for i in self.env_idxs]
-        rewards = [self.get_base_info(i)[1] for i in self.env_idxs] # Incentivize side movement 
-        dones = np.zeros(len(self.env_idxs))
-        return observations, rewards, dones, time_steps
+    def termination(self):
+        return np.zeros(len(self.env_idxs))
 
     def get_base_info(self, i):
         return self.snake.get_rb_poses_as_np_array(i, 'snake')[1]

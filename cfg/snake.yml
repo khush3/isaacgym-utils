@@ -1,6 +1,7 @@
 training:
   n_episodes: 500
   episode_len: 500
+  learning_rate: 0.02
 scene:
   n_envs: 1
   es: 1

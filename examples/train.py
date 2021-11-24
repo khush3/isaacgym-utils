@@ -9,6 +9,7 @@ sys.path.append('./isaacgym_utils')
 
 from isaacgym_utils.policy_generic import SnakeRandomExploration
 from isaacgym_utils.snake_environment import SnakeEnv
+import numpy as np
 
 
 if __name__ == "__main__":
@@ -17,15 +18,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
     cfg = YamlConfig(args.cfg)
 
-    policy = SnakeRandomExploration()
+    policy = SnakeRandomExploration(n_envs=cfg['scene']['n_envs'])
     envs = SnakeEnv(cfg)
 
     for ep in range(cfg['training']['n_episodes']):
         observations = envs.reset()
-        ret = 0
+        rets = np.array([0.] * cfg['scene']['n_envs'])
         for _ in range(cfg['training']['episode_len']):
-            actions = [policy(i) for i in observations]
+            actions = policy(observations)
             observations, rewards, dones, _ = envs.step(actions)
-            ret += rewards[0]
-        policy.update(ret)    
-        print(f'Episode {ep}, Return: {ret}')
+            rets += np.array(rewards)
+        policy.update(rets)    
+        print(f'Episode {ep}, Return: {rets}, Best Ret: {policy.best_return}, best coeffs: {policy.theta}')

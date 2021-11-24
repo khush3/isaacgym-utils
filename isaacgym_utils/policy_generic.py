@@ -1,9 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
 
-from .math_utils import min_jerk, slerp_quat, vec3_to_np, np_to_vec3, \
-                    project_to_line, compute_task_space_impedance_control
-
 
 class Policy(ABC):
 
@@ -24,30 +21,33 @@ class Policy(ABC):
 
 class SnakeRandomExploration(Policy):
 
-    def __init__(self, perturbation_factor=0.3, init='best_action', *args, **kwargs):
+    def __init__(self, n_envs, perturbation_factor=0.08, init='zero', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.learning_rate = 0.02
         self.best_directions = 1
+        self.envs = range(n_envs)
         self.perturbation_factor = perturbation_factor
         if init=='random': 
             print("Training from random policy")
             self.theta = np.random.rand(7)
         elif init=='best_action':
-            self.theta = np.array([0, 0.7, 0, 0, .5, 4, 0]) # Linear progression
+            self.theta = np.array([0.21772525, 0.56285663, 0.25177039, 0.0944957, 0.03984703, 0.44255845, 0.36545371]) # Linear progression
         elif init=='zero':
             print("Training from zero matrix policy")
-        self.best_return = 0
-        self.new_theta = self.theta + self.perturbate
+            self.theta = np.zeros(7)
+        self.best_return = -1e10
+        self.perturbate()
 
     def __call__(self, observation):
-        return self.new_theta
+        return self.new_thetas
 
-    def update(self, ret):
-        if ret > self.best_return:
-            self.theta = self.new_theta
-            self.best_return = ret
-        self.new_theta = self.theta + self.perturbate
+    def update(self, rets):
+        for env, ret in zip(self.envs, rets):
+            if ret > self.best_return:
+                print('Yo updated')
+                self.theta = self.new_thetas[env]
+                self.best_return = ret
+        self.perturbate()
 
-    @property
     def perturbate(self):
-        return np.random.rand(7) * self.perturbation_factor
+        self.new_thetas = [self.theta + np.random.rand(7) * self.perturbation_factor for _ in self.envs]

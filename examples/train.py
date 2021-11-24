@@ -1,3 +1,4 @@
+from comet_ml import Experiment
 import argparse
 from autolab_core import YamlConfig
 import sys, os
@@ -9,6 +10,7 @@ sys.path.append('./isaacgym_utils')
 
 from isaacgym_utils.policy_generic import SnakeRandomExploration
 from isaacgym_utils.snake_environment import SnakeEnv
+from utils import Logger
 import numpy as np
 
 
@@ -179,22 +181,8 @@ def explore(env, policy, direction, delta, hp):
 
 # Training the AI
 def train(env, policy, hp, parentPipes, args):
-    # args.logdir = "experiments/" + args.logdir
-    # logger = DataLog()
     total_steps = 0
     best_return = -99999999
-
-    # Logging, saving data
-    # working_dir = os.getcwd()
-    # if os.path.isdir(args.logdir) == False:
-    #     os.mkdir(args.logdir)
-    # previous_dir = os.getcwd()
-    # os.chdir(args.logdir)
-    # if os.path.isdir('iterations') == False: os.mkdir('iterations')
-    # if os.path.isdir('logs') == False: os.mkdir('logs')
-    # hp.to_text('hyperparameters')
-    # log_dir = os.getcwd()
-    # os.chdir(working_dir)
 
     for step in range(hp.nb_steps):
         # Initializing the perturbations deltas and the positive/negative rewards
@@ -257,35 +245,16 @@ def train(env, policy, hp, parentPipes, args):
         print("step", step)
 
         if step % hp.evalstep == 0:
-            # reward_evaluation = policyevaluation(env, policy, hp)
             print("eval step")
             reward = explore(env, policy, None, None, hp)
-            # logger.log_kv('steps', step)
-            # logger.log_kv('return', reward)
             if (reward > best_return):
-                best_policy = policy.theta
                 best_return = reward
-                # np.save(log_dir + "/iterations/best_policy.npy", best_policy)
-                print("Best Policy:", best_policy)
-            print('Step:', step, 'Reward:', reward)
-            # policy_path = log_dir + "/iterations/" + "policy_" + str(step)
-            # np.save(policy_path, policy.theta)
-
-            # logger.save_log(log_dir + "/logs/")
-            # make_train_plots_ars(log=logger.log, keys=['steps', 'return'], save_loc=log_dir + "/logs/")
-
-
-# Running the main code
-# def mkdir(base, name):
-#     path = os.path.join(base, name)
-#     if not os.path.exists(path):
-#         os.makedirs(path)
-#     return path
+            logger.update(reward, policy.theta)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # parser.add_argument('--init_policy', help='Starting policy file (npy)', type=str, default='')
-    parser.add_argument('--cfg', help='config file', type=str, default='cfg/snake.yml')
+    parser.add_argument('--cfg', help='config file', type=str, default=os.path.abspath(os.getcwd())+'/../cfg/snake.yml')
     parser.add_argument('--init_policy', help='initial policy (zero matrix or random)', type=int, default=1)
     parser.add_argument('--logdir', help='Directory root to log policy files (npy)', type=str, default='logdir_name')
     parser.add_argument('--episode_length', help='length of each episode', type=int, default=10)
@@ -299,6 +268,7 @@ if __name__ == "__main__":
     action_dim = cfg['training']['action_dim']
 
     hp = HyperParameters()
+    logger = Logger(cfg)
     # args.init_policy = './initial_policies/' + args.policy
     hp.msg = args.msg
     env = SnakeEnv(cfg)
@@ -345,3 +315,4 @@ if __name__ == "__main__":
 
         for p in processes:
             p.join()
+

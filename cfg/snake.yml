@@ -7,12 +7,19 @@ training:
   state_dim: 16
   action_dim: 1
   multiprocessing: 1
-  max_processes: 0
+  max_processes: 6
+  api_key: Wlh5wstMNYkxV0yWRxN7JXZRu
+  project_name: snake-rl
+  log_online: 1
+  log_offline: 1
+  print_stats: 1
+  log_path: log
+  tags: toy-1
 
 scene:
   n_envs: 1
   es: 1
-  gui: 1
+  gui: 0
   cam:
     cam_pos: [1.2, 0, 1.2]
     look_at: [0.5, 0, 1]

@@ -21,7 +21,7 @@ class Policy(ABC):
 
 class SnakeRandomExploration(Policy):
 
-    def __init__(self, n_envs, perturbation_factor=0.08, init='zero', *args, **kwargs):
+    def __init__(self, n_envs, perturbation_factor=0.08, init='best_action', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.learning_rate = 0.02
         self.best_directions = 1
@@ -31,12 +31,13 @@ class SnakeRandomExploration(Policy):
             print("Training from random policy")
             self.theta = np.random.rand(7)
         elif init=='best_action':
-            self.theta = np.array([0.21772525, 0.56285663, 0.25177039, 0.0944957, 0.03984703, 0.44255845, 0.36545371]) # Linear progression
+            # self.theta = np.array([0.21772525, 0.56285663, 0.25177039, 0.0944957, 0.03984703, 0.44255845, 0.36545371]) # Linear progression
+            self.theta = np.array([0.75, 0., 0., 0.25, 4, 2, np.pi/2]) # Linear progression
         elif init=='zero':
             print("Training from zero matrix policy")
             self.theta = np.zeros(7)
         self.best_return = -1e10
-        self.perturbate()
+        # self.perturbate()
 
     def __call__(self, observation):
         return self.new_thetas

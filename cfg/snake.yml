@@ -1,7 +1,14 @@
 training:
   n_episodes: 500
-  episode_len: 500
+  episode_length: 500
   learning_rate: 0.02
+  noise: 0.03
+  directions: 2
+  state_dim: 16
+  action_dim: 1
+  multiprocessing: 1
+  max_processes: 0
+
 scene:
   n_envs: 1
   es: 1

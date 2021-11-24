@@ -3,7 +3,7 @@ from isaacgym import gymapi
 from isaacgym_utils.scene import GymScene
 from isaacgym_utils.assets import GymSnake, GymBoxAsset
 from isaacgym_utils.draw import draw_transforms
-
+import ipdb
 
 class SnakeEnv():
     def __init__(self, cfg):
@@ -32,15 +32,20 @@ class SnakeEnv():
 
         self.init_rb_transform = self.snake.get_rb_transforms(0, self._name)
 
+        self.n_steps = 0
 
     def reset(self):
         self.t_sim = 0
+        self.n_steps = 0
         for i in self.env_idxs: self.snake.reset(i, self._name, self.init_rb_transform)
         observations = self.get_observation()
         return observations
 
     def step(self, actions):
         self.t_sim += self.dt
+        self.n_steps += 1
+        # print("actions", actions)
+        # ipdb.set_trace()
 
         for env_idx in self.env_idxs:
             target_angles = self.snake.controller(actions[env_idx], self.t_sim)
@@ -55,13 +60,21 @@ class SnakeEnv():
         return observations, rewards, dones, None
 
     def get_observation(self):
-        return [np.concatenate([self.get_dof_pose(i), self.get_dof_vel(i), self.get_base_info(i)]) for i in self.env_idxs]
+        # return [np.concatenate([self.get_dof_pose(i), self.get_dof_vel(i), self.get_base_info(i)]) for i in self.env_idxs]
+        return [self.get_dof_pose(i).reshape(-1, 1) for i in self.env_idxs]
 
     def get_reward(self):
-        return [self.get_base_info(i)[1] for i in self.env_idxs] # Incentivize side movement 
+        total_reward = 0
+        move_x_reward = [-1*abs(self.get_base_info(i)[0]) for i in self.env_idxs] # Incentivize side movement 
+        move_y_reward = [self.get_base_info(i)[1] for i in self.env_idxs] # Incentivize side movement
+        total_reward =  [x + y for x, y in zip(move_x_reward, move_y_reward)]
+        return total_reward
+        # return [self.get_base_info(i) for i in self.env_idxs] # Incentivize side movement 
 
     def termination(self):
-        return np.zeros(len(self.env_idxs))
+        if self.n_steps >= self.cfg['training']['episode_length']: dones = [True] * len(self.env_idxs)
+        else: dones = [False] * len(self.env_idxs)
+        return dones
 
     def get_base_info(self, i):
         return self.snake.get_rb_poses_as_np_array(i, 'snake')[1]
@@ -74,7 +87,6 @@ class SnakeEnv():
 
     def custom_draws(self, scene):
         draw_transforms(scene, scene.env_idxs, [self.snake_transform], length=0.2)
-
 
     def setup(self, scene, _):
         if self.cfg['table'] is not None: scene.add_asset('table', self.table, self.table_transform)

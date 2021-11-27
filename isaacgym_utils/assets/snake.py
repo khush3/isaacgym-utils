@@ -300,14 +300,14 @@ class GymSnake(GymURDFAsset):
         self.set_joints(env_idx, name, self.INIT_JOINTS)
 
     def controller(self, params, t):
-        # A_odd, A_even, beta_odd, beta_even, Ws, Wt, delta = params
-        Ws = params
-        A_odd = 0.6
-        A_even = 0.6
-        beta_odd = 0.0
-        beta_even = 0.0
-        Wt = 2
-        delta = np.pi/4
+        A_odd, A_even, beta_odd, beta_even, Ws, Wt, delta = params
+        # Ws = params
+        # A_odd = 0.6
+        # A_even = 0.6
+        # beta_odd = 0.0
+        # beta_even = 0.0
+        # Wt = 2
+        # delta = np.pi/4
         angles = []
         reversals = np.array([1, 1, -1, -1] * int(self._num_modules/4))
         for n in range(self._num_modules):

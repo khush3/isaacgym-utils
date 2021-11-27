@@ -1,13 +1,16 @@
 training:
+  num_envs: 2
   n_episodes: 500
   episode_length: 500
   learning_rate: 0.02
   noise: 0.03
-  directions: 2
+  directions: 0.5
+  curi_learn: 0
+  eval_ep: 3
   state_dim: 16
   action_dim: 1
-  multiprocessing: 1
-  max_processes: 6
+
+logging:
   api_key: Wlh5wstMNYkxV0yWRxN7JXZRu
   project_name: snake-rl
   log_online: 1

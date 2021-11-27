@@ -18,7 +18,7 @@ def to_list(ip):
 
 class Logger:
     def __init__(self, config):
-        self.args = config['training']
+        self.args = config['logging']
         self.log_path = self.args['log_path']
         self.log_online = self.args['log_online']
         self.log_offline = self.args['log_offline']

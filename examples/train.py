@@ -2,137 +2,41 @@ from comet_ml import Experiment
 import argparse
 from autolab_core import YamlConfig
 import sys, os
+import numpy as np
+import torch
 import ipdb
 
 sys.path.append('..')
 sys.path.append('.')
 sys.path.append('./isaacgym_utils')
 
-from isaacgym_utils.policy_generic import SnakeRandomExploration
 from isaacgym_utils.snake_environment import SnakeEnv
 from utils import Logger
-import numpy as np
 
-
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('--cfg', '-c', type=str, default='cfg/snake.yml')
-#     args = parser.parse_args()
-#     cfg = YamlConfig(args.cfg)
-
-#     policy = SnakeRandomExploration(n_envs=cfg['scene']['n_envs'])
-#     envs = SnakeEnv(cfg)
-
-#     for ep in range(cfg['training']['n_episodes']):
-#         observations = envs.reset()
-#         rets = np.array([0.] * cfg['scene']['n_envs'])
-#         for _ in range(cfg['training']['episode_length']):
-#             # actions = policy(observations)
-#             actions = [np.array([0.6, 0.6, 0.0, 0.0, 0.5, 2, np.pi/4])]
-#             observations, rewards, dones, _ = envs.step(actions)
-#             rets += np.array(rewards)
-#         policy.update(rets)    
-#         print(f'Episode {ep}, Return: {rets}, Best Ret: {policy.best_return}, best coeffs: {policy.theta}')
-
-##############################################################
-
-import multiprocessing as mp
-from multiprocessing import Pipe
-import math
-
-PI = math.pi
+PI = np.pi
 
 class HyperParameters():
-    """
-    This class is basically a struct that contains all the hyperparameters that you want to tune
-    """
 
-    def __init__(self, init_policy=0, msg='', nb_steps=10000, episode_length=400, learning_rate=0.02,
-                 nb_directions=16, nb_best_directions=8, noise=0.03, seed=1, curilearn=60, evalstep=3):
-        self.nb_steps = nb_steps
+    def __init__(self, num_envs=1024, init_policy=0, episodes=1000, episode_length=400,
+                 learning_rate=0.02, best_directions=128, noise=0.03, curilearn=0, eval_episode=3):
+        self.num_envs = num_envs
+        self.episodes = episodes
         self.episode_length = episode_length
         self.learning_rate = learning_rate
-        self.nb_directions = nb_directions
-        self.nb_best_directions = nb_best_directions
-        assert self.nb_best_directions <= self.nb_directions
+        self.best_directions = best_directions
+        assert self.best_directions <= self.num_envs
         self.noise = noise
-        self.seed = seed
         self.init_policy = init_policy
-        self.msg = msg
         self.curilearn = curilearn
-        self.evalstep = evalstep
-        self.domain_Rand = 1
-        self.logdir = ""
-        self.anti_clock_ori = True
-
-    def to_text(self, path):
-        res_str = ''
-        res_str = res_str + 'learning_rate: ' + str(self.learning_rate) + '\n'
-        res_str = res_str + 'noise: ' + str(self.noise) + '\n'
-        res_str = res_str + 'env_name: ' + str(self.env_name) + '\n'
-        res_str = res_str + 'episode_length: ' + str(self.episode_length) + '\n'
-        res_str = res_str + 'direction ratio: ' + str(self.nb_directions / self.nb_best_directions) + '\n'
-        res_str = res_str + 'Normal initialization: ' + str(self.normal) + '\n'
-        res_str = res_str + 'Gait: ' + str(self.gait) + '\n'
-        res_str = res_str + 'Incline_Orientaion_Anti-Clockwise: ' + str(self.anti_clock_ori) + '\n'
-        res_str = res_str + 'domain_Randomization: ' + str(self.domain_Rand) + '\n'
-        res_str = res_str + 'Curriculmn introduced at iteration: ' + str(self.curilearn) + '\n'
-        res_str = res_str + self.msg + '\n'
-        fileobj = open(path, 'w')
-        fileobj.write(res_str)
-        fileobj.close()
-
-# Multiprocess Exploring the policy on one specific direction and over one episode
-
-_RESET = 1
-_CLOSE = 2
-_EXPLORE = 3
-
-def ExploreWorker(rank, childPipe, args):
-    env = SnakeEnv(cfg)
-    n = 0
-    while True:
-        n += 1
-        try:
-            # Only block for short times to have keyboard exceptions be raised.
-            if not childPipe.poll(0.001):
-                continue
-            message, payload = childPipe.recv()
-        except (EOFError, KeyboardInterrupt):
-            break
-        if message == _RESET:
-            childPipe.send(["reset ok"])
-            continue
-        if message == _EXPLORE:
-            policy = payload[0]
-            hp = payload[1]
-            direction = payload[2]
-            delta = payload[3]
-            state = env.reset()
-            # ipdb.set_trace()
-            done = False
-            num_plays = 0
-            sum_rewards = 0
-            while num_plays < hp.episode_length:
-                action = policy.evaluate(state[0], delta, direction, hp)
-                state, reward, done, _ = env.step(action)
-                sum_rewards += reward
-                num_plays += 1
-            childPipe.send([sum_rewards, num_plays])
-            continue
-        if message == _CLOSE:
-            childPipe.send(["close ok"])
-            break
-    childPipe.close()
-
-# Building the AI
-
+        self.eval_episode = eval_episode
+        
 class Policy():
 
-    def __init__(self, input_size, output_size, init_policy, args):
+    def __init__(self, input_size, output_size, init_policy):
         try:
             print("Training from guided policy")
-            self.theta = np.load(args.init_policy)
+            # init_policy = path_to_init_policy
+            self.theta = np.load(init_policy)
             print(self.theta)
         except:
             if (init_policy):
@@ -140,179 +44,103 @@ class Policy():
                 self.theta = np.random.randn(output_size, input_size)
             else:
                 print("Training from zero policy")
-                self.theta = np.zeros((output_size, input_size))                
+                self.theta = np.zeros((output_size, input_size))
 
         print("Starting policy theta=", self.theta)
 
-    def evaluate(self, input, delta, direction, hp):
-        if direction is None:
-            p = self.theta
-            return p.dot(input).reshape(1,-1)
-        elif direction == "positive":
-            p = self.theta + hp.noise * delta
-            return p.dot(input).reshape(1,-1)
-        else:
-            p = self.theta - hp.noise * delta
-            return p.dot(input).reshape(1,-1)
+    def get_policy(self, deltas, mode, hp):
+        if mode == "evaluate":
+            return torch.from_numpy(self.theta).repeat(hp.num_envs, 1, 1)
+        elif mode == "explore":
+            perturb = torch.cat((hp.noise*deltas, -hp.noise*deltas))
+            return torch.from_numpy(self.theta).repeat(hp.num_envs, 1, 1) + perturb
 
     def sample_deltas(self):
-        return [np.random.randn(*self.theta.shape) for _ in range(hp.nb_directions)]
+        return torch.randn((hp.num_envs/2), self.theta.shape[0], self.theta.shape[0])
 
-    def update(self, rollouts, sigma_r, args):
+    def update(self, rollouts, sigma_r):
         step = np.zeros(self.theta.shape)
         for r_pos, r_neg, direction in rollouts:
-            step += (r_pos - r_neg) * direction
-        self.theta += hp.learning_rate / (hp.nb_best_directions * sigma_r) * step
+            step += (float(r_pos) - float(r_neg)) * direction.numpy()
+        self.theta += hp.learning_rate / (hp.best_directions * sigma_r) * step
 
-# Exploring the policy on one specific direction and over one episode
-
-def explore(env, policy, direction, delta, hp):
+def run_episode(env, policy, mode, deltas, hp):
     state = env.reset()
     done = False
     num_plays = 0
-    sum_rewards = 0
+    sum_rewards = torch.tensor([0]*hp.num_envs)
     while num_plays < hp.episode_length:
-        action = policy.evaluate(state[0], delta, direction, hp)
+        policy = policy.get_policy(deltas, mode, hp)
+        action = torch.matmul(policy, state).reshape(hp.num_envs, 1, -1)
         state, reward, done, _ = env.step(action)
-        sum_rewards += reward[0]
+        sum_rewards += reward
         # ipdb.set_trace()
         num_plays += 1
     return sum_rewards
 
 # Training the AI
-def train(env, policy, hp, parentPipes, args):
-    total_steps = 0
-    best_return = -99999999
+def train(env, policy, hp):
+    best_return = -1e5
 
-    for step in range(hp.nb_steps):
+    for episode in range(hp.episodes):
         # Initializing the perturbations deltas and the positive/negative rewards
         deltas = policy.sample_deltas()
-        positive_rewards = [0] * hp.nb_directions
-        negative_rewards = [0] * hp.nb_directions
-        if (parentPipes):
-            process_count = len(parentPipes)
-        if parentPipes:
-            p = 0
-            while (p < hp.nb_directions):
-                temp_p = p
-                n_left = hp.nb_directions - p  # Number of processes required to complete the search
-                for k in range(min([process_count, n_left])):
-                    parentPipe = parentPipes[k]
-                    parentPipe.send([_EXPLORE, [policy, hp, "positive", deltas[temp_p]]])
-                    temp_p = temp_p + 1
-                temp_p = p
-                for k in range(min([process_count, n_left])):
-                    positive_rewards[temp_p], step_count = parentPipes[k].recv()
-                    total_steps = total_steps + step_count
-                    temp_p = temp_p + 1
-                temp_p = p
 
-                for k in range(min([process_count, n_left])):
-                    parentPipe = parentPipes[k]
-                    parentPipe.send([_EXPLORE, [policy, hp, "negative", deltas[temp_p]]])
-                    temp_p = temp_p + 1
-                temp_p = p
-
-                for k in range(min([process_count, n_left])):
-                    negative_rewards[temp_p], step_count = parentPipes[k].recv()
-                    total_steps = total_steps + step_count
-                    temp_p = temp_p + 1
-                p = p + process_count
-                print('total steps till now: ', total_steps, 'Processes done: ', p)
-
-        else:
-            # Getting the positive rewards in the positive directions
-            for k in range(hp.nb_directions):
-                positive_rewards[k] = explore(env, policy, "positive", deltas[k], hp)
-
-            # Getting the negative rewards in the negative/opposite directions
-            for k in range(hp.nb_directions):
-                negative_rewards[k] = explore(env, policy, "negative", deltas[k], hp)
+        rewards = run_episode(env, policy, "explore", deltas, hp)
+        positive_rewards, negative_rewards = torch.split(rewards, hp.num_envs)
 
         # Sorting the rollouts by the max(r_pos, r_neg) and selecting the best directions
         scores = {
-            k: max(r_pos, r_neg)
+            k: max(float(r_pos), float(r_neg))
             for k, (r_pos, r_neg) in enumerate(zip(positive_rewards, negative_rewards))
         }
-        order = sorted(scores.keys(), key=lambda x: -scores[x])[:int(hp.nb_best_directions)]
-        rollouts = [(positive_rewards[k], negative_rewards[k], deltas[k]) for k in order]
+        order = sorted(scores.keys(), key=lambda x: -scores[x])[:int(hp.best_directions)]
+        rollouts = [(float(positive_rewards[k]), float(negative_rewards[k]), deltas[k]) for k in order]
 
         # Gathering all the positive/negative rewards to compute the standard deviation of these rewards
-        all_rewards = np.array([x[0] for x in rollouts] + [x[1] for x in rollouts])
-        sigma_r = all_rewards.std()  # Standard deviation of only rewards in the best directions is what it should be
+        best_rewards = np.array([x[0] for x in rollouts] + [x[1] for x in rollouts])
+        sigma_r = float(best_rewards.std())  # Standard deviation of only rewards in the best directions is what it should be
         # Updating our policy
-        policy.update(rollouts, sigma_r, args)
-        print("step", step)
+        policy.update(rollouts, sigma_r)
+        print("episode", episode)
 
-        if step % hp.evalstep == 0:
-            print("eval step")
-            reward = explore(env, policy, None, None, hp)
+        if episode % hp.eval_episode == 0:
+            # print("evaluating policy this episode")
+            reward = run_episode(env, policy, "evaluate", None, hp)
+            reward = float(reward.sum())/hp.num_envs
             if (reward > best_return):
                 best_return = reward
             logger.update(reward, policy.theta)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    # parser.add_argument('--init_policy', help='Starting policy file (npy)', type=str, default='')
+    parser.add_argument('--init_policy', help='Starting policy file (npy)', type=str, default='')
     parser.add_argument('--cfg', help='config file', type=str, default=os.path.abspath(os.getcwd())+'/../cfg/snake.yml')
-    parser.add_argument('--init_policy', help='initial policy (zero matrix or random)', type=int, default=1)
-    parser.add_argument('--logdir', help='Directory root to log policy files (npy)', type=str, default='logdir_name')
-    parser.add_argument('--episode_length', help='length of each episode', type=int, default=10)
-    parser.add_argument('--curi_learn', help='after how many iteration steps second stage of curriculum learning should start', type=int, default=0) # default 10, removing curriculum learning
-    parser.add_argument('--eval_step', help='policy evaluation after how many steps should take place', type=int, default=3)
     parser.add_argument('--msg', help='msg to save in a text file', type=str, default='')
     args = parser.parse_args()
 
     cfg = YamlConfig(args.cfg)
-    state_dim = cfg['training']['state_dim']
-    action_dim = cfg['training']['action_dim']
-
     hp = HyperParameters()
     logger = Logger(cfg)
-    # args.init_policy = './initial_policies/' + args.policy
-    hp.msg = args.msg
     env = SnakeEnv(cfg)
-    hp.seed = 123
-    hp.nb_steps = cfg['training']['n_episodes']
+    np.random.seed(123)
+
+    # args.init_policy = './initial_policies/' + args.policy
+
+    state_dim = cfg['training']['state_dim']
+    action_dim = cfg['training']['action_dim']
+    hp.num_envs = cfg['training']['num_envs']
+    hp.episodes = cfg['training']['n_episodes']
     hp.episode_length = cfg['training']['episode_length']
     hp.learning_rate = cfg['training']['learning_rate']
     hp.noise = cfg['training']['noise']
-    hp.nb_directions = state_dim * action_dim
-    hp.nb_best_directions = int(hp.nb_directions / cfg['training']['directions'])
+    hp.best_directions = int(hp.num_envs * cfg['training']['directions'])
+    hp.curilearn = cfg['training']['curi_learn']
+    hp.eval_episode = cfg['training']['eval_ep']
     hp.init_policy = args.init_policy
-    # hp.curilearn = args.curi_learn
-    hp.evalstep = args.eval_step
-    # print("log dir", args.logdir)
-    hp.logdir = args.logdir
-    np.random.seed(hp.seed)
-    max_processes = cfg['training']['max_processes']
-    parentPipes = None
-    if cfg['training']['multiprocessing']:
-        num_processes = min([hp.nb_directions, max_processes])
-        print('processes: ', num_processes)
-        processes = []
-        childPipes = []
-        parentPipes = []
 
-        for pr in range(num_processes):
-            parentPipe, childPipe = Pipe()
-            parentPipes.append(parentPipe)
-            childPipes.append(childPipe)
+    # args.msg to Logger
 
-        for rank in range(num_processes):
-            p = mp.Process(target=ExploreWorker, args=(rank, childPipes[rank], args))
-            p.start()
-            processes.append(p)
-
-    policy = Policy(state_dim, action_dim, hp.init_policy, args)
-    print("start training")
-
-    train(env, policy, hp, parentPipes, args)
-
-    if cfg['training']['multiprocessing']:
-        for parentPipe in parentPipes:
-            parentPipe.send([_CLOSE, "pay2"])
-
-        for p in processes:
-            p.join()
-
+    policy = Policy(state_dim, action_dim, hp.init_policy)
+    # print("start training")
+    train(env, policy, hp)
